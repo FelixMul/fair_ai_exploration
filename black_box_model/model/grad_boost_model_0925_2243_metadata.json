@@ -1,0 +1,13 @@
+{
+  "model_type": "LGBMRegressor_l2",
+  "timestamp": "0925_2243",
+  "train_size": 868988,
+  "test_size": 217248,
+  "n_features": 34,
+  "n_categorical_features": 6,
+  "n_numerical_features": 28,
+  "test_accuracy": 0.7703914420385919,
+  "test_auc": 0.7215029651859771,
+  "graph_path": "/Users/felix_myu/Desktop/HEC/AI Interpretability/fair_ai_exploration/black_box_model/graphs/accuracy_progress_0925_2243.png",
+  "model_path": "/Users/felix_myu/Desktop/HEC/AI Interpretability/fair_ai_exploration/black_box_model/model/grad_boost_model_0925_2243.joblib"
+}

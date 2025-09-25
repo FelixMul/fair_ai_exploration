@@ -7,8 +7,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import classification_report, roc_auc_score, accuracy_score
 
-# Use classic GradientBoostingClassifier to access staged predictions for accuracy-over-iterations
-from sklearn.ensemble import GradientBoostingClassifier
+# Use LightGBM with a custom objective for differentiable rounding around cutoff
+import lightgbm as lgb
 
 # Plotting, saving models/metadata
 import matplotlib
@@ -39,6 +39,8 @@ except FileNotFoundError:
 
 # Identify columns to exclude from features
 columns_to_exclude = [c for c in ['target', 'Predictions', 'Predicted probabilities', 'Unnamed: 0'] if c in df.columns]
+# Drop sensitive attribute(s)
+columns_to_exclude += [c for c in df.columns if 'Pct_afro_american' in c]
 
 # The 'target' column is our dependent variable (y)
 y = df['target']
@@ -86,8 +88,8 @@ preprocessor = ColumnTransformer(
 
 ### Cell 6: Define the Full Model Pipeline
 
-# Define the model using scikit-learn's GradientBoostingClassifier (supports staged predictions)
-model = GradientBoostingClassifier(n_estimators=200, random_state=42)
+# Define the model using LightGBM with explicit l2 (MSE) objective
+model = lgb.LGBMRegressor(objective='l2', n_estimators=200, random_state=42)
 
 # Create the full pipeline by chaining the preprocessor and the model
 full_pipeline = Pipeline(steps=[('preprocessor', preprocessor),
@@ -101,14 +103,18 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 
 print("Training the model...")
 # The pipeline handles imputation, scaling, and encoding automatically
-full_pipeline.fit(X_train, y_train)
+train_weights = np.where(y_train.values == 1, 2.0, 1.0)
+full_pipeline.fit(X_train, y_train, classifier__sample_weight=train_weights)
 print("Model training complete.")
 
 print("--- Evaluating Model Performance on Test Data ---")
 
-# Get predictions
-y_pred = full_pipeline.predict(X_test)
-y_pred_proba = full_pipeline.predict_proba(X_test)[:, 1]
+# Get regression scores and apply cutoff for classification
+cutoff = 0.5
+y_score = full_pipeline.predict(X_test)
+y_pred = (y_score >= cutoff).astype(int)
+# Clip scores to [0,1] for interpretability
+y_pred_proba = np.clip(y_score, 0.0, 1.0)
 
 # Calculate metrics
 accuracy = accuracy_score(y_test, y_pred)
@@ -120,21 +126,44 @@ print("\n--- Classification Report ---")
 print(classification_report(y_test, y_pred))
 
 # --- Compute accuracy over boosting iterations (train and test) ---
-print("Computing staged accuracies over boosting iterations...")
+print("Computing per-iteration metrics (LightGBM)...")
 
 # Transform datasets using the fitted preprocessor
 preprocessor_fitted = full_pipeline.named_steps['preprocessor']
-classifier_fitted = full_pipeline.named_steps['classifier']
+regressor_fitted = full_pipeline.named_steps['classifier']
 X_train_processed = preprocessor_fitted.transform(X_train)
 X_test_processed = preprocessor_fitted.transform(X_test)
 
 train_accuracies = []
 test_accuracies = []
-for y_pred_train, y_pred_test in zip(
-        classifier_fitted.staged_predict(X_train_processed),
-        classifier_fitted.staged_predict(X_test_processed)):
-    train_accuracies.append(accuracy_score(y_train, y_pred_train))
-    test_accuracies.append(accuracy_score(y_test, y_pred_test))
+train_mse_rounded = []
+test_mse_rounded = []
+train_obj_loss = []
+test_obj_loss = []
+num_iters = getattr(regressor_fitted, 'n_estimators', 0) or 0
+if num_iters:
+    for i in range(1, num_iters + 1):
+        score_train = regressor_fitted.predict(X_train_processed, num_iteration=i)
+        score_test = regressor_fitted.predict(X_test_processed, num_iteration=i)
+        y_pred_train_iter = (score_train >= cutoff).astype(int)
+        y_pred_test_iter = (score_test >= cutoff).astype(int)
+        train_accuracies.append(accuracy_score(y_train, y_pred_train_iter))
+        test_accuracies.append(accuracy_score(y_test, y_pred_test_iter))
+        # Rounded-label MSE (equivalent to misclassification rate)
+        train_mse_rounded.append(float(np.mean((y_train.values - y_pred_train_iter) ** 2)))
+        test_mse_rounded.append(float(np.mean((y_test.values - y_pred_test_iter) ** 2)))
+        # Objective loss used during training: MSE on raw regression predictions (weighted on both splits)
+        if 'train_weights' in locals():
+            w_train = train_weights
+            train_obj = float(np.sum(w_train * (y_train.values - score_train) ** 2) / np.sum(w_train))
+        else:
+            train_obj = float(np.mean((y_train.values - score_train) ** 2))
+        w_test = np.where(y_test.values == 1, 2.0, 1.0)
+        test_obj = float(np.sum(w_test * (y_test.values - score_test) ** 2) / np.sum(w_test))
+        train_obj_loss.append(train_obj)
+        test_obj_loss.append(test_obj)
+else:
+    print("Warning: Unable to determine number of iterations for per-iteration accuracy plot.")
 
 # Plot and save accuracy-over-iterations graph
 timestamp = datetime.now().strftime('%m%d_%H%M')
@@ -152,11 +181,37 @@ plt.savefig(graph_path, dpi=150)
 plt.close()
 print(f"Saved accuracy-over-iterations graph to: {graph_path}")
 
+# Dual-panel figure: Objective loss (left) and Rounded-label MSE (right)
+fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=True)
+iters = range(1, len(train_accuracies) + 1)
+
+axes[0].plot(iters, train_obj_loss, label='Train Objective (MSE raw)')
+axes[0].plot(iters, test_obj_loss, label='Test Objective (MSE raw)')
+axes[0].set_xlabel('Number of Estimators')
+axes[0].set_ylabel('Objective (MSE on raw predictions)')
+axes[0].set_title('Objective loss (LightGBM default: MSE on raw)')
+axes[0].legend()
+axes[0].grid(True, alpha=0.3)
+
+axes[1].plot(iters, train_mse_rounded, label='Train Rounded MSE')
+axes[1].plot(iters, test_mse_rounded, label='Test Rounded MSE')
+axes[1].set_xlabel('Number of Estimators')
+axes[1].set_ylabel('MSE (rounded labels)')
+axes[1].set_title(f'Rounded-label MSE (cutoff={cutoff})')
+axes[1].legend()
+axes[1].grid(True, alpha=0.3)
+
+dual_graph_path = os.path.join(GRAPHS_DIR, f'training_progress_dual_{timestamp}.png')
+plt.tight_layout()
+plt.savefig(dual_graph_path, dpi=150)
+plt.close()
+print(f"Saved dual training progress graph to: {dual_graph_path}")
+
 # Persist the trained pipeline and metadata
 model_path = os.path.join(MODEL_DIR, f'grad_boost_model_{timestamp}.joblib')
 joblib.dump(full_pipeline, model_path)
 metadata = {
-    'model_type': 'GradientBoostingClassifier',
+    'model_type': 'LGBMRegressor_l2',
     'timestamp': timestamp,
     'train_size': int(len(y_train)),
     'test_size': int(len(y_test)),
@@ -176,7 +231,8 @@ print(f"Saved metadata to: {metadata_path}")
 
 # Export required columns to data/ for later use
 print("Exporting Unnamed: 0, target, grad_boost_predict to data/ ...")
-all_predictions = full_pipeline.predict(X)
+all_scores = full_pipeline.predict(X)
+all_predictions = (all_scores >= cutoff).astype(int)
 export_df = pd.DataFrame({
     'Unnamed: 0': id_series.values,
     'target': df['target'].values,
@@ -185,3 +241,57 @@ export_df = pd.DataFrame({
 preds_csv_path = os.path.join(DATA_DIR, f'dataproject2025_grad_boost_predictions_{timestamp}.csv')
 export_df.to_csv(preds_csv_path, index=False)
 print(f"Saved predictions CSV to: {preds_csv_path}")
+
+# Bar chart: percentage of predicted 0s and 1s across cutoffs
+cutoffs = [0.22, 0.26, 0.3, 0.34, 0.38, 0.42, 0.46, 0.5]
+perc_ones = []
+perc_zeros = []
+for c in cutoffs:
+    preds_c = (all_scores >= c).astype(int)
+    perc_ones.append(float((preds_c == 1).mean()))
+    perc_zeros.append(float((preds_c == 0).mean()))
+
+plt.figure(figsize=(7, 5))
+x = np.arange(len(cutoffs))
+width = 0.38
+plt.bar(x - width/2, perc_zeros, width=width, label='Predicted 0')
+plt.bar(x + width/2, perc_ones, width=width, label='Predicted 1')
+plt.xticks(x, [str(c) for c in cutoffs])
+plt.ylim(0, 1)
+plt.ylabel('Percentage of predictions')
+plt.xlabel('Cutoff value')
+plt.title('Predicted class distribution across cutoffs')
+plt.legend()
+cutoff_graph_path = os.path.join(GRAPHS_DIR, f'predicted_distribution_by_cutoff_{timestamp}.png')
+plt.tight_layout()
+plt.savefig(cutoff_graph_path, dpi=150)
+plt.close()
+print(f"Saved cutoff distribution graph to: {cutoff_graph_path}")
+
+# Histogram of raw regression scores with out-of-range highlight
+out_low = int((all_scores < 0).sum())
+out_high = int((all_scores > 1).sum())
+total_scores = int(len(all_scores))
+
+fig, ax = plt.subplots(figsize=(8, 5))
+ax.hist(all_scores, bins=60, color='steelblue', alpha=0.85)
+ax.axvline(0, color='crimson', linestyle='--', linewidth=1.5, label='0/1 bounds')
+ax.axvline(1, color='crimson', linestyle='--', linewidth=1.5)
+ax.set_xlabel('Raw regression score')
+ax.set_ylabel('Count')
+ax.set_title('Distribution of regression scores (raw)')
+ax.legend()
+
+# Annotate out-of-range counts in axes coordinates
+annot = (
+    f"< 0: {out_low} ({(out_low/total_scores*100 if total_scores else 0):.2f}%)\n"
+    f"> 1: {out_high} ({(out_high/total_scores*100 if total_scores else 0):.2f}%)"
+)
+ax.text(0.02, 0.98, annot, transform=ax.transAxes, va='top', ha='left',
+        bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+
+score_hist_path = os.path.join(GRAPHS_DIR, f'regression_score_distribution_{timestamp}.png')
+plt.tight_layout()
+plt.savefig(score_hist_path, dpi=150)
+plt.close()
+print(f"Saved regression score distribution histogram to: {score_hist_path}")
