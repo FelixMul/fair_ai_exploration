@@ -1,0 +1,13 @@
+{
+  "model_type": "GradientBoostingClassifier",
+  "timestamp": "0925_1218",
+  "train_size": 868988,
+  "test_size": 217248,
+  "n_features": 35,
+  "n_categorical_features": 6,
+  "n_numerical_features": 29,
+  "test_accuracy": 0.7938807261746944,
+  "test_auc": 0.7165729738466571,
+  "graph_path": "/Users/nehasharma/fair_ai_exploration-1/black_box_model/graphs/accuracy_progress_0925_1218.png",
+  "model_path": "/Users/nehasharma/fair_ai_exploration-1/black_box_model/model/grad_boost_model_0925_1218.joblib"
+}
