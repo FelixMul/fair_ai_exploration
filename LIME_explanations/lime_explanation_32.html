@@ -37089,25 +37089,25 @@
 /***/ })
 /******/ ]);
 //# sourceMappingURL=bundle.js.map </script></head><body>
-        <div class="lime top_div" id="top_divSHNPQOGJDAHA2MN"></div>
+        <div class="lime top_div" id="top_divX6XEKBUAPJVPW9G"></div>
         
         <script>
-        var top_div = d3.select('#top_divSHNPQOGJDAHA2MN').classed('lime top_div', true);
+        var top_div = d3.select('#top_divX6XEKBUAPJVPW9G').classed('lime top_div', true);
         
         
                     var pp_div = top_div.append('div')
                                         .classed('lime predicted_value', true);
                     var pp_svg = pp_div.append('svg').style('width', '100%');
-                    var pp = new lime.PredictedValue(pp_svg, 0.03331640544457513, 0.013647461502983484, 0.8360037652528934);
+                    var pp = new lime.PredictedValue(pp_svg, 0.03331640544457513, 0.016833598124298813, 0.8737665229080593);
                     
         var exp_div;
             var exp = new lime.Explanation(["negative", "positive"]);
         
             exp_div = top_div.append('div').classed('lime explanation', true);
-            exp.show([["int_rate <= 10.49", -0.1456445347990278], ["loan duration <= 0.00", -0.09718500854839567], ["funded_amnt <= 8325.00", -0.06574346927038476], ["mo_sin_old_rev_tl_op <= 114.00", 0.03716206289604476], ["2016.00 < issue_d <= 2017.00", 0.03570671689529476], ["revol_bal <= 6239.00", 0.030643945702844934], ["mths_since_recent_bc > 28.00", -0.02924800393544714], ["home_ownership=MORTGAGE", -0.028931408137014936], ["fico_range_high > 709.00", -0.02791740387782807], ["num_actv_bc_tl <= 2.00", -0.025221651999536274]], 1, exp_div);
+            exp.show([["int_rate <= 10.49", -0.14785109654534379], ["loan duration <= 0.00", -0.09498889749959412], ["funded_amnt <= 8325.00", -0.06858156165263092], ["2016.00 < issue_d <= 2017.00", 0.044612893561124134], ["mo_sin_old_rev_tl_op <= 114.00", 0.03520972972744386], ["mths_since_recent_bc > 28.00", -0.030755626113776625], ["fico_range_high > 709.00", -0.028761458694043018], ["revol_bal <= 6239.00", 0.026193853511655485], ["home_ownership=MORTGAGE", -0.024857155214875127], ["num_actv_bc_tl <= 2.00", -0.024007853413744906]], 1, exp_div);
             
         var raw_div = top_div.append('div');
-            exp.show_raw_tabular([["int_rate", "5.32", -0.1456445347990278], ["loan duration", "0.00", -0.09718500854839567], ["funded_amnt", "2000.00", -0.06574346927038476], ["mo_sin_old_rev_tl_op", "67.00", 0.03716206289604476], ["issue_d", "2017.00", 0.03570671689529476], ["revol_bal", "1189.00", 0.030643945702844934], ["mths_since_recent_bc", "51.00", -0.02924800393544714], ["home_ownership=MORTGAGE", "True", -0.028931408137014936], ["fico_range_high", "744.00", -0.02791740387782807], ["num_actv_bc_tl", "1.00", -0.025221651999536274]], 1, raw_div);
+            exp.show_raw_tabular([["int_rate", "5.32", -0.14785109654534379], ["loan duration", "0.00", -0.09498889749959412], ["funded_amnt", "2000.00", -0.06858156165263092], ["issue_d", "2017.00", 0.044612893561124134], ["mo_sin_old_rev_tl_op", "67.00", 0.03520972972744386], ["mths_since_recent_bc", "51.00", -0.030755626113776625], ["fico_range_high", "744.00", -0.028761458694043018], ["revol_bal", "1189.00", 0.026193853511655485], ["home_ownership=MORTGAGE", "True", -0.024857155214875127], ["num_actv_bc_tl", "1.00", -0.024007853413744906]], 1, raw_div);
         
         </script>
         </body></html>
