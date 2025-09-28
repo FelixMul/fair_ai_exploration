@@ -1,0 +1,52 @@
+{
+  "shape": [
+    1086236,
+    39
+  ],
+  "columns": [
+    "Unnamed: 0",
+    "issue_d",
+    "loan duration",
+    "annual_inc",
+    "avg_cur_bal",
+    "bc_open_to_buy",
+    "bc_util",
+    "delinq_2yrs",
+    "dti",
+    "emp_length",
+    "emp_title",
+    "fico_range_high",
+    "funded_amnt",
+    "grade",
+    "home_ownership",
+    "inq_last_6mths",
+    "int_rate",
+    "mo_sin_old_rev_tl_op",
+    "mo_sin_rcnt_rev_tl_op",
+    "mo_sin_rcnt_tl",
+    "mort_acc",
+    "mths_since_recent_bc",
+    "num_actv_bc_tl",
+    "num_bc_tl",
+    "num_il_tl",
+    "num_rev_accts",
+    "open_acc",
+    "pub_rec",
+    "pub_rec_bankruptcies",
+    "purpose",
+    "revol_bal",
+    "revol_util",
+    "sub_grade",
+    "target",
+    "tax_liens",
+    "zip_code",
+    "Pct_afro_american",
+    "Predictions",
+    "Predicted probabilities"
+  ],
+  "target_counts": {
+    "0": 857588,
+    "1": 228648
+  },
+  "target_rate": 0.2104956933852312
+}
