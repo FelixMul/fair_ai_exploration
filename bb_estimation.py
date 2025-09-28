@@ -3,11 +3,12 @@ import matplotlib.pyplot as plt
 import os
 from datetime import datetime
 from matplotlib.ticker import PercentFormatter
+from sklearn.metrics import roc_curve, auc
 
 df_original = pd.read_csv("data/dataproject2025.csv")
 print(f"Number of rows with missing values: {df_original.isna().any(axis=1).sum()}")
 
-df = pd.read_csv("data/dataproject2025_grad_boost_predictions_0925_2243.csv")
+df = pd.read_csv("data/dataproject2025_grad_boost_predictions_0928_1753.csv")
 
 # Count rows where both 2nd and 3rd columns are 1
 both_ones = df[(df['target'] == 1) & (df['grad_boost_predict'] == 1)]
@@ -66,3 +67,60 @@ out_path = f"outputs/accuracy_by_target_stacked_{datetime.now().strftime('%Y%m%d
 plt.tight_layout()
 plt.savefig(out_path, dpi=150)
 print(f"Saved plot to {out_path}")
+
+# --- ROC Curve and AUC ---
+roc_y_true = df['target'].values
+score_column = None
+if 'grad_boost_proba' in df.columns:
+    score_column = 'grad_boost_proba'
+elif 'grad_boost_score_raw' in df.columns:
+    score_column = 'grad_boost_score_raw'
+else:
+    score_column = None
+
+timestamp = datetime.now().strftime('%Y%m%d_%H%M')
+if score_column is not None:
+    scores = df[score_column].values
+    fpr, tpr, thresholds = roc_curve(roc_y_true, scores)
+    roc_auc = auc(fpr, tpr)
+
+    plt.figure(figsize=(6, 5))
+    plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (AUC = {roc_auc:.3f})')
+    plt.plot([0, 1], [0, 1], color='navy', lw=1, linestyle='--', label='Chance')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver Operating Characteristic')
+    plt.legend(loc="lower right")
+    roc_path = f"outputs/roc_curve_{timestamp}.png"
+    plt.tight_layout()
+    plt.savefig(roc_path, dpi=150)
+    plt.close()
+    print(f"AUC: {roc_auc:.4f}")
+    print(f"Saved ROC curve to {roc_path}")
+else:
+    # Fallback: attempt ROC using binary predictions if no scores exist
+    if 'grad_boost_predict' in df.columns:
+        preds = df['grad_boost_predict'].values
+        # With binary-only predictions the ROC curve has at most two points and AUC reduces to accuracy for balanced classes; inform user.
+        fpr, tpr, thresholds = roc_curve(roc_y_true, preds)
+        roc_auc = auc(fpr, tpr)
+        plt.figure(figsize=(6, 5))
+        plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (AUC ~ {roc_auc:.3f})')
+        plt.plot([0, 1], [0, 1], color='navy', lw=1, linestyle='--', label='Chance')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver Operating Characteristic (binary-only fallback)')
+        plt.legend(loc="lower right")
+        roc_path = f"outputs/roc_curve_binary_fallback_{timestamp}.png"
+        plt.tight_layout()
+        plt.savefig(roc_path, dpi=150)
+        plt.close()
+        print("Warning: No score/probability column found. Using binary predictions for ROC; AUC is less informative.")
+        print(f"Fallback AUC (binary): {roc_auc:.4f}")
+        print(f"Saved ROC curve (fallback) to {roc_path}")
+    else:
+        print("Warning: Could not compute ROC/AUC because no score or prediction columns were found.")
