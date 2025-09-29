@@ -230,13 +230,17 @@ print(f"Saved model to: {model_path}")
 print(f"Saved metadata to: {metadata_path}")
 
 # Export required columns to data/ for later use
-print("Exporting Unnamed: 0, target, grad_boost_predict to data/ ...")
+print("Exporting Unnamed: 0, target, grad_boost_predict, grad_boost_proba to data/ ...")
 all_scores = full_pipeline.predict(X)
 all_predictions = (all_scores >= cutoff).astype(int)
+# Clip to [0, 1] to provide a probability-like score for downstream ROC/AUC
+all_scores_clipped = np.clip(all_scores, 0.0, 1.0)
 export_df = pd.DataFrame({
     'Unnamed: 0': id_series.values,
     'target': df['target'].values,
-    'grad_boost_predict': all_predictions
+    'grad_boost_predict': all_predictions,
+    'grad_boost_proba': all_scores_clipped,
+    'grad_boost_score_raw': all_scores
 })
 preds_csv_path = os.path.join(DATA_DIR, f'dataproject2025_grad_boost_predictions_{timestamp}.csv')
 export_df.to_csv(preds_csv_path, index=False)
@@ -295,3 +299,49 @@ plt.tight_layout()
 plt.savefig(score_hist_path, dpi=150)
 plt.close()
 print(f"Saved regression score distribution histogram to: {score_hist_path}")
+
+# --- START: Feature Importance Plotting ---
+print("--- Generating Feature Importance Plot ---")
+
+# Access the fitted preprocessor and the trained model from the pipeline
+preprocessor_fitted = full_pipeline.named_steps['preprocessor']
+regressor_fitted = full_pipeline.named_steps['classifier']
+
+try:
+    # Get feature importances from the trained LightGBM model
+    feature_importances = getattr(regressor_fitted, 'feature_importances_', None)
+    if feature_importances is None:
+        raise AttributeError("The model does not provide feature_importances_.")
+
+    # Access the fitted 'onehot' encoder within the 'cat' transformer
+    onehot_encoder = preprocessor_fitted.named_transformers_['cat'].named_steps['onehot']
+
+    # Get the feature names from the one-hot encoder
+    onehot_feature_names = onehot_encoder.get_feature_names_out(categorical_features)
+
+    # Combine with numerical feature names to get the full list of final feature names
+    final_feature_names = numerical_features + list(onehot_feature_names)
+
+    # Create a pandas Series for easier sorting and plotting
+    importances_series = pd.Series(feature_importances, index=final_feature_names)
+
+    # Sort the features by importance and select the top 20 for readability
+    top_n = 20
+    top_importances = importances_series.sort_values(ascending=True).tail(top_n)
+
+    plt.figure(figsize=(10, 8))
+    top_importances.plot(kind='barh', color='skyblue')
+    plt.xlabel("Feature Importance")
+    plt.ylabel("Feature Name")
+    plt.title(f"Top {top_n} Most Important Features")
+    plt.grid(axis='x', linestyle='--', alpha=0.6)
+
+    feature_importance_graph_path = os.path.join(GRAPHS_DIR, f'feature_importance_{timestamp}.png')
+    plt.tight_layout()
+    plt.savefig(feature_importance_graph_path, dpi=150)
+    plt.close()
+    print(f"Saved feature importance plot to: {feature_importance_graph_path}")
+except Exception as e:
+    print(f"Could not generate feature importance plot. Error: {e}")
+    print("This might happen if feature names cannot be resolved or the model lacks feature_importances_.")
+# --- END: Feature Importance Plotting ---
