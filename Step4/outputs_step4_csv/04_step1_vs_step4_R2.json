@@ -1,0 +1,8 @@
+{
+  "teacher_source": "HARD:dataproject2025_grad_boost_predictions_0925_2243.csv",
+  "y_column_used": "grad_boost_predict__PRED",
+  "step1_tree_R2": 0.7401407308792118,
+  "step1_lasso_R2": 0.22285973720475682,
+  "step4_tree_R2": 0.4524088837257084,
+  "step4_lasso_R2": 0.10602672572302019
+}

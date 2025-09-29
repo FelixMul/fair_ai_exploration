@@ -1,0 +1,22 @@
+|--- int_rate <= 17.82
+|   |--- loan duration <= 0.50
+|   |   |--- int_rate <= 16.00
+|   |   |   |--- value: [0.01]
+|   |   |--- int_rate >  16.00
+|   |   |   |--- value: [0.13]
+|   |--- loan duration >  0.50
+|   |   |--- avg_cur_bal <= 9702.50
+|   |   |   |--- value: [0.39]
+|   |   |--- avg_cur_bal >  9702.50
+|   |   |   |--- value: [0.09]
+|--- int_rate >  17.82
+|   |--- loan duration <= 0.50
+|   |   |--- funded_amnt <= 7237.50
+|   |   |   |--- value: [0.15]
+|   |   |--- funded_amnt >  7237.50
+|   |   |   |--- value: [0.47]
+|   |--- loan duration >  0.50
+|   |   |--- avg_cur_bal <= 19411.50
+|   |   |   |--- value: [0.83]
+|   |   |--- avg_cur_bal >  19411.50
+|   |   |   |--- value: [0.43]
